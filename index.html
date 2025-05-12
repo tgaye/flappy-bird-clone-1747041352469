@@ -1,0 +1,336 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird Clone</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100vh;
+        }
+        #game-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+
+<base target="_self">
+
+
+    </head><body><div id="game-info"></div>
+    <script>
+        let bird;
+        let pipes = [];
+        let gravity;
+        let lift;
+        let score = 0;
+        let highScore = 0;
+        let gameState = 'start'; // 'start', 'play', 'gameover'
+        let pipeSpeed = 2;
+        let pipeFrequency = 100;
+        let backgroundImg;
+        let birdColor;
+        let difficulty = 'medium'; // 'easy', 'medium', 'hard'
+
+        function preload() {
+            // No external assets for pure implementation
+        }
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            
+            // Initialize game parameters based on difficulty
+            setDifficulty(difficulty);
+            
+            // Create bird
+            resetBird();
+            
+            // Initialize pipes array
+            pipes = [];
+            
+            // Set initial score
+            score = 0;
+        }
+
+        function setDifficulty(level) {
+            difficulty = level;
+            switch(level) {
+                case 'easy':
+                    gravity = 0.4;
+                    lift = -10;
+                    pipeSpeed = 1.5;
+                    pipeFrequency = 120;
+                    break;
+                case 'medium':
+                    gravity = 0.5;
+                    lift = -12;
+                    pipeSpeed = 2;
+                    pipeFrequency = 100;
+                    break;
+                case 'hard':
+                    gravity = 0.6;
+                    lift = -14;
+                    pipeSpeed = 2.5;
+                    pipeFrequency = 80;
+                    break;
+            }
+        }
+
+        function resetBird() {
+            bird = {
+                x: width / 3,
+                y: height / 2,
+                r: 20,
+                velocity: 0,
+                color: color(255, 204, 0)
+            };
+        }
+
+        function draw() {
+            // Background
+            background(135, 206, 235);
+            
+            // Draw ground
+            fill(34, 139, 34);
+            rect(0, height - 50, width, 50);
+            
+            // Game state handling
+            switch(gameState) {
+                case 'start':
+                    drawStartScreen();
+                    break;
+                case 'play':
+                    updateGame();
+                    drawGame();
+                    break;
+                case 'gameover':
+                    drawGameOver();
+                    break;
+            }
+            
+            // Display game info
+            displayGameInfo();
+        }
+
+        function drawStartScreen() {
+            // Draw bird
+            fill(bird.color);
+            ellipse(bird.x, bird.y, bird.r * 2);
+            
+            // Draw title
+            textAlign(CENTER, CENTER);
+            textSize(32);
+            fill(255);
+            text("Flappy Bird", width/2, height/3);
+            
+            // Draw instructions
+            textSize(20);
+            text("Click or press SPACE to start", width/2, height/2);
+            text("Difficulty: " + difficulty, width/2, height/2 + 50);
+            
+            // Draw difficulty options
+            textSize(16);
+            text("Press 1 for Easy, 2 for Medium, 3 for Hard", width/2, height/2 + 100);
+        }
+
+        function drawGameOver() {
+            // Draw game over text
+            textAlign(CENTER, CENTER);
+            textSize(32);
+            fill(255, 0, 0);
+            text("GAME OVER", width/2, height/3);
+            
+            // Draw score
+            textSize(24);
+            fill(255);
+            text("Score: " + score, width/2, height/2);
+            text("High Score: " + highScore, width/2, height/2 + 40);
+            
+            // Draw restart instructions
+            textSize(20);
+            text("Click or press SPACE to restart", width/2, height/2 + 100);
+        }
+
+        function updateGame() {
+            // Update bird
+            bird.velocity += gravity;
+            bird.y += bird.velocity;
+            
+            // Check if bird hits the ground or ceiling
+            if (bird.y > height - 50 - bird.r || bird.y < bird.r) {
+                gameOver();
+            }
+            
+            // Generate new pipes
+            if (frameCount % pipeFrequency === 0) {
+                generatePipe();
+            }
+            
+            // Update and check pipes
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].x -= pipeSpeed;
+                
+                // Check if bird passes pipe
+                if (!pipes[i].passed && bird.x > pipes[i].x + pipes[i].w) {
+                    pipes[i].passed = true;
+                    score++;
+                    if (score > highScore) {
+                        highScore = score;
+                    }
+                }
+                
+                // Check collision with pipe
+                if (collideWithPipe(bird, pipes[i])) {
+                    gameOver();
+                }
+                
+                // Remove pipes that are off screen
+                if (pipes[i].x < -pipes[i].w) {
+                    pipes.splice(i, 1);
+                }
+            }
+        }
+
+        function drawGame() {
+            // Draw pipes
+            for (let pipe of pipes) {
+                drawPipe(pipe);
+            }
+            
+            // Draw bird
+            drawBird();
+        }
+
+        function drawBird() {
+            fill(bird.color);
+            ellipse(bird.x, bird.y, bird.r * 2);
+            
+            // Draw eye
+            fill(0);
+            ellipse(bird.x + bird.r/2, bird.y - bird.r/3, bird.r/3);
+            
+            // Draw beak
+            fill(255, 165, 0);
+            triangle(
+                bird.x + bird.r, bird.y,
+                bird.x + bird.r * 1.5, bird.y - bird.r/3,
+                bird.x + bird.r * 1.5, bird.y + bird.r/3
+            );
+        }
+
+        function generatePipe() {
+            let gap = map(score, 0, 20, 180, 120, true);
+            let topHeight = random(50, height - gap - 50 - 50);
+            
+            pipes.push({
+                x: width,
+                y: 0,
+                w: 60,
+                h: topHeight,
+                gap: gap,
+                passed: false,
+                color: color(0, 128, 0)
+            });
+        }
+
+        function drawPipe(pipe) {
+            fill(pipe.color);
+            // Top pipe
+            rect(pipe.x, pipe.y, pipe.w, pipe.h);
+            // Bottom pipe
+            rect(pipe.x, pipe.h + pipe.gap, pipe.w, height - pipe.h - pipe.gap - 50);
+        }
+
+        function collideWithPipe(bird, pipe) {
+            // Check collision with top pipe
+            if (bird.x + bird.r > pipe.x && bird.x - bird.r < pipe.x + pipe.w &&
+                bird.y - bird.r < pipe.h) {
+                return true;
+            }
+            // Check collision with bottom pipe
+            if (bird.x + bird.r > pipe.x && bird.x - bird.r < pipe.x + pipe.w &&
+                bird.y + bird.r > pipe.h + pipe.gap) {
+                return true;
+            }
+            return false;
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+        }
+
+        function displayGameInfo() {
+            if (gameState === 'play') {
+                let infoDiv = document.getElementById('game-info');
+                infoDiv.textContent = `Score: ${score} | High Score: ${highScore} | Difficulty: ${difficulty}`;
+            } else {
+                document.getElementById('game-info').textContent = '';
+            }
+        }
+
+        function keyPressed() {
+            if (key === ' ') {
+                handleAction();
+            }
+            if (key === '1') {
+                setDifficulty('easy');
+            }
+            if (key === '2') {
+                setDifficulty('medium');
+            }
+            if (key === '3') {
+                setDifficulty('hard');
+            }
+        }
+
+        function mousePressed() {
+            handleAction();
+        }
+
+        function handleAction() {
+            switch(gameState) {
+                case 'start':
+                    gameState = 'play';
+                    break;
+                case 'play':
+                    bird.velocity = lift;
+                    break;
+                case 'gameover':
+                    resetGame();
+                    break;
+            }
+        }
+
+        function resetGame() {
+            pipes = [];
+            score = 0;
+            resetBird();
+            gameState = 'play';
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+
+              
+          
+                
+          
+              
+</body></html>
